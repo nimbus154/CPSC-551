@@ -1,9 +1,8 @@
-#include<unistd.h>
-#include<sys/syscall.h>
-#include<linux/sched.h>
-#include<include/asm/current.h>
-#include<stdio.h>
-#include<stdlib.h>
+#include <linux/kernel.h>
+#include <linux/list.h>
+#include <linux/sched.h>
+#include <linux/slab.h>
+#include <linux/kthread.h>
 
 struct procinfo
 {
@@ -36,13 +35,14 @@ void populate_proc_info(struct task_struct *ts, struct procinfo *info)
 }
 
 /*Retrieves information about a PID and stores it in a procinfo*/
-asmlinkage int get_procinfo(pid_t pid, struct procinfo *info)
+asmlinkage long get_procinfo(pid_t pid, struct procinfo *info)
 {
 	struct task_struct *ts;
-	ts = pid <= 0 ?  get_current() : find_task_by_vpid(pid);
+	//ts = pid <= 0 ?  get_current() : find_task_by_vpid(pid);
+	ts = find_task_by_vpid(pid);
 
 	if(ts == null)
-		return EINVAL;
+		return 1;
 	else if(pid < 0)
 		ts = ts->real_parent;
 
@@ -50,17 +50,3 @@ asmlinkage int get_procinfo(pid_t pid, struct procinfo *info)
 	return 0;
 }
 
-int main(int argc, char *argv[])
-{
-	if(argc != 2)
-	{
-		printf("Useage:\n\tgetproc <pid>\n");
-		return 1;
-	}
-
-	struct procinfo info;
-	get_procinfo(atoi(argv[1]), &info);
-
-	printf("PROCESS INFO:\n\tpid: %d\n", info.pid);
-	return 0;
-}
