@@ -1,3 +1,7 @@
+/*
+	Name: 		Chad Wyszynski
+	Assignment: Implementing a system call
+*/
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/sched.h>
@@ -12,9 +16,14 @@ struct procinfo
 	int num_sib; /*number of siblings*/
 };
 
+/*
 void printTime(int seconds)
 {
-	printk(KERN_CRIT "\tStart Time: %d:%d:%d\n", seconds/3600, seconds/60, seconds);
+	int hours = seconds / 3600;
+	seconds -= 3600*hours;
+	int minutes = seconds/60;
+	seconds -= 60*minutes;
+	printk(KERN_CRIT "\tStart Time: %d:%d:%d\n", hours, minutes, seconds);
 }
 
 void printProcinfo(struct procinfo *info)
@@ -25,16 +34,15 @@ void printProcinfo(struct procinfo *info)
 	printk(KERN_CRIT "\tNumber of Siblings: %d\n", info->num_sib);
 	printTime(info->start_time.tv_sec);
 }
+*/
 
 /* Counts number of nodes in list*/
-int countNodes(struct list_head head)
+int countNodes(struct list_head *head)
 {
 	int n = 0;
-/*
-	struct list_head *current;
-	list_for_each(current, &head)
+	struct list_head *pos;
+	list_for_each(pos, head)
 		n++;
-*/
 	return n;
 }
 
@@ -44,11 +52,13 @@ void populate_proc_info(struct task_struct *ts, struct procinfo *info)
 	info->pid = ts->pid;
 	info->ppid = ts->real_parent->pid;
 	info->start_time = ts->start_time;
-	printTime(info->start_time.tv_sec);
-	info->num_sib = countNodes(ts->sibling);
+	info->num_sib = countNodes(&ts->sibling);
 }
 
-/*Retrieves information about a PID and stores it in a procinfo*/
+/*
+Retrieves information about a PID and stores it in a procinfo struct
+Returns 0 on success; -1 if pid not found
+*/
 asmlinkage long sys_get_procinfo(pid_t pid, struct procinfo *info)
 {
 	struct task_struct *ts;
@@ -68,10 +78,9 @@ asmlinkage long sys_get_procinfo(pid_t pid, struct procinfo *info)
 		ts = ts->real_parent;
 		rcu_read_unlock();
 	}
-	printk(KERN_CRIT "Found PID. Populating struct...");
 
 	populate_proc_info(ts, info);
-	printProcinfo(info);
-	return 154;
+	/*printProcinfo(info);*/
+	return 0;
 }
 
