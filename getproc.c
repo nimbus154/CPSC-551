@@ -12,16 +12,29 @@ struct procinfo
 	int num_sib; /*number of siblings*/
 };
 
+void printTime(int seconds)
+{
+	printk(KERN_CRIT "\tStart Time: %d:%d:%d\n", seconds/3600, seconds/60, seconds);
+}
+
+void printProcinfo(struct procinfo *info)
+{
+	printk(KERN_CRIT "Process Information:\n");
+	printk(KERN_CRIT "\tPID: %d\n", info->pid);
+	printk(KERN_CRIT "\tPPID: %d\n", info->ppid);
+	printk(KERN_CRIT "\tNumber of Siblings: %d\n", info->num_sib);
+	printTime(info->start_time.tv_sec);
+}
+
 /* Counts number of nodes in list*/
-int countNodes(list_head *head)
+int countNodes(struct list_head head)
 {
 	int n = 0;
-	while(head != NULL)
-	{
-		head = head->next;
+/*
+	struct list_head *current;
+	list_for_each(current, &head)
 		n++;
-	}
-
+*/
 	return n;
 }
 
@@ -29,24 +42,36 @@ int countNodes(list_head *head)
 void populate_proc_info(struct task_struct *ts, struct procinfo *info)
 {
 	info->pid = ts->pid;
-	info->ppid = ts->real_parent->pid;	
+	info->ppid = ts->real_parent->pid;
 	info->start_time = ts->start_time;
+	printTime(info->start_time.tv_sec);
 	info->num_sib = countNodes(ts->sibling);
 }
 
 /*Retrieves information about a PID and stores it in a procinfo*/
-asmlinkage long get_procinfo(pid_t pid, struct procinfo *info)
+asmlinkage long sys_get_procinfo(pid_t pid, struct procinfo *info)
 {
 	struct task_struct *ts;
-	//ts = pid <= 0 ?  get_current() : find_task_by_vpid(pid);
-	ts = find_task_by_vpid(pid);
+	pid_t orig_pid = pid;
+	if(pid <= 0)  
+		pid = task_tgid_vnr(current);
 
-	if(ts == null)
-		return 1;
-	else if(pid < 0)
+	rcu_read_lock();
+	ts = find_task_by_vpid(pid);
+	rcu_read_unlock();
+
+	if(ts == NULL)
+		return -1;
+	else if(orig_pid < 0)
+	{
+		rcu_read_lock();
 		ts = ts->real_parent;
+		rcu_read_unlock();
+	}
+	printk(KERN_CRIT "Found PID. Populating struct...");
 
 	populate_proc_info(ts, info);
-	return 0;
+	printProcinfo(info);
+	return 154;
 }
 
