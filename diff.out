@@ -1,0 +1,166 @@
+diff linux-3.3.8/arch/x86/syscalls/syscall_32.tbl linux-3.3.8-chad/arch/x86/syscalls/syscall_32.tbl
+357a358
+> 349 i386	get_procinfo		sys_get_procinfo
+diff linux-3.3.8/arch/x86/syscalls/syscall_64.tbl linux-3.3.8-chad/arch/x86/syscalls/syscall_64.tbl
+320a321
+> 312 64	get_procinfo		sys_get_procinfo
+diff linux-3.3.8/Makefile linux-3.3.8-chad/Makefile
+711c711
+< core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/
+---
+> core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/ samples/get_procinfo
+
+linux-3.3.8/samples/get_procinfo/Makefile - DOES NOT EXIST
+linux-3.3.8-chad/samples/get_procinfo/Makefile
+obj-y := get_procinfo.o
+
+linux-3.3.8/samples/get_procinfo/Makefile - DOES NOT EXIST
+linux-3.3.8-chad/samples/get_procinfo/get_procinfo.c
+/*
+	Name: 		Chad Wyszynski
+	Assignment: Implementing a system call
+*/
+#include <linux/kernel.h>
+#include <linux/list.h>
+#include <linux/sched.h>
+#include <linux/slab.h>
+#include <linux/kthread.h>
+
+struct procinfo
+{
+	pid_t pid;	/*process's id*/
+	pid_t ppid; /*parent id*/
+	struct timespec start_time; /*process start time*/
+	int num_sib; /*number of siblings*/
+};
+
+/*
+void printTime(int seconds)
+{
+	int hours = seconds / 3600;
+	seconds -= 3600*hours;
+	int minutes = seconds/60;
+	seconds -= 60*minutes;
+	printk(KERN_CRIT "\tStart Time: %d:%d:%d\n", hours, minutes, seconds);
+}
+
+void printProcinfo(struct procinfo *info)
+{
+	printk(KERN_CRIT "Process Information:\n");
+	printk(KERN_CRIT "\tPID: %d\n", info->pid);
+	printk(KERN_CRIT "\tPPID: %d\n", info->ppid);
+	printk(KERN_CRIT "\tNumber of Siblings: %d\n", info->num_sib);
+	printTime(info->start_time.tv_sec);
+}
+*/
+
+/* Counts number of nodes in list*/
+int countNodes(struct list_head *head)
+{
+	int n = 0;
+	struct list_head *pos;
+	list_for_each(pos, head)
+		n++;
+	return n;
+}
+
+/*Populates a procinfo with information from a task_struct*/
+void populate_proc_info(struct task_struct *ts, struct procinfo *info)
+{
+	info->pid = ts->pid;
+	info->ppid = ts->real_parent->pid;
+	info->start_time = ts->start_time;
+	info->num_sib = countNodes(&ts->sibling);
+}
+
+/*
+Retrieves information about a PID and stores it in a procinfo struct
+Returns 0 on success; -1 if pid not found
+*/
+asmlinkage long sys_get_procinfo(pid_t pid, struct procinfo *info)
+{
+	struct task_struct *ts;
+	pid_t orig_pid = pid;
+	if(pid <= 0)  
+		pid = task_tgid_vnr(current);
+
+	rcu_read_lock();
+	ts = find_task_by_vpid(pid);
+	rcu_read_unlock();
+
+	if(ts == NULL)
+		return -1;
+	else if(orig_pid < 0)
+	{
+		rcu_read_lock();
+		ts = ts->real_parent;
+		rcu_read_unlock();
+	}
+
+	populate_proc_info(ts, info);
+	/*printProcinfo(info);*/
+	return 0;
+}
+
+linux-3.3.8/samples/get_procinfo/userspace/Makefile - DOES NOT EXIST
+linux-3.3.8-chad/samples/get_procinfo/userspace/Makefile
+all:
+	gcc get_procinfo_user.c -o get_procinfo
+clean:
+	rm get_procinfo
+
+linux-3.3.8/samples/get_procinfo/userspace/get_procinfo_user.c - DOES NOT EXIST
+linux-3.3.8-chad/samples/get_procinfo/userspace/get_procinfo_user.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/syscall.h>
+
+#define SYS_getproc __NR_getproc
+struct procinfo
+{
+	pid_t pid;	/*process's id*/
+	pid_t ppid; /*parent id*/
+	struct timespec start_time; /*process start time*/
+	int num_sib; /*number of siblings*/
+};
+
+void printTime(int seconds)
+{
+	int hours = seconds / 3600;
+	seconds -= 3600*hours;
+	int minutes = seconds/60;
+	seconds -= 60*minutes;
+	printf("\tStarted %02d:%02d:%02d after system boot\n", hours, minutes, seconds);
+}
+
+void printProcinfo(struct procinfo *info)
+{
+	printf("Process Information:\n");
+	printf("\tPID: %d\n", info->pid);
+	printf("\tPPID: %d\n", info->ppid);
+	printf("\tNumber of Siblings: %d\n", info->num_sib);
+	printTime(info->start_time.tv_sec);
+}
+
+int main(int argc, char *argv[])
+{
+	if(argc != 2)
+	{
+		printf("Useage:\n\tgetproc <pid>\n");
+		printf("\tEnter 0 for current process "
+				"and a negative value for parent of current.\n");
+		return 1;
+	}
+
+	struct procinfo *info = malloc(sizeof(struct procinfo));
+	
+	if(syscall(SYS_getproc, atoi(argv[1]), info) != -1)
+		printProcinfo(info);
+
+	free(info);
+	info = NULL;
+	return 0;
+}
