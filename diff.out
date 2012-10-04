@@ -14,7 +14,7 @@ linux-3.3.8/samples/get_procinfo/Makefile - DOES NOT EXIST
 linux-3.3.8-chad/samples/get_procinfo/Makefile
 obj-y := get_procinfo.o
 
-linux-3.3.8/samples/get_procinfo/Makefile - DOES NOT EXIST
+linux-3.3.8/samples/get_procinfo/get_procinfo.c - DOES NOT EXIST
 linux-3.3.8-chad/samples/get_procinfo/get_procinfo.c
 /*
 	Name: 		Chad Wyszynski
